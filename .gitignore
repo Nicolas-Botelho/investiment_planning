@@ -1,0 +1,6 @@
+# ignore folders
+_*
+
+# ignore files
+.env
+.venv
