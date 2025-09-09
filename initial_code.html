@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Patrimônio</title>
+    <!-- Adiciona o script do Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Adiciona o script do Chart.js para criar os gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Adiciona as bibliotecas do Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let userId = null;
+
+        // Listen for authentication state changes
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                document.getElementById('userIdDisplay').textContent = userId;
+                // Load data after successful login
+                loadData();
+            } else {
+                // If no user is logged in, try anonymous sign-in or use custom token
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Firebase Auth Error: ", error);
+                }
+            }
+        });
+        
+        // Expose Firebase objects to the global scope
+        window.db = db;
+        window.auth = auth;
+        window.userId = userId;
+        window.appId = appId;
+        window.setDoc = setDoc;
+        window.doc = doc;
+        window.onSnapshot = onSnapshot;
+
+        // Function to save data to Firestore
+        window.saveData = async () => {
+            if (!userId) {
+                console.error("Usuário não autenticado. Não é possível salvar os dados.");
+                return;
+            }
+
+            // Get all input values
+            const data = {
+                valorDesejado: document.getElementById('valorDesejado').value,
+                percentual: document.getElementById('percentual').value,
+                fiiPercentual: document.getElementById('fiiPercentual').value,
+                acoesPercentual: document.getElementById('acoesPercentual').value,
+                rendaFixaPercentual: document.getElementById('rendaFixaPercentual').value,
+                internacionalPercentual: document.getElementById('internacionalPercentual').value,
+                fiiDividendoPercentual: document.getElementById('fiiDividendoPercentual').value,
+                acoesDividendoPercentual: document.getElementById('acoesDividendoPercentual').value,
+                rendaFixaDividendoPercentual: document.getElementById('rendaFixaDividendoPercentual').value,
+                internacionalDividendoPercentual: document.getElementById('internacionalDividendoPercentual').value,
+                taxaRetorno: document.getElementById('taxaRetorno').value,
+                anos: document.getElementById('anos').value,
+            };
+
+            const dataPath = `/artifacts/${appId}/users/${userId}/data`;
+            const docRef = doc(db, dataPath, "user_data");
+            
+            try {
+                await setDoc(docRef, data);
+                console.log("Dados salvos com sucesso!");
+                showMessage("Dados salvos com sucesso!", 'bg-green-100 text-green-700');
+            } catch (e) {
+                console.error("Erro ao salvar os dados: ", e);
+                showMessage("Erro ao salvar os dados.", 'bg-red-100 text-red-700');
+            }
+        };
+
+        // Function to load data from Firestore
+        window.loadData = () => {
+             if (!userId) {
+                console.log("Aguardando autenticação para carregar os dados.");
+                return;
+            }
+
+            const dataPath = `/artifacts/${appId}/users/${userId}/data`;
+            const docRef = doc(db, dataPath, "user_data");
+
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    document.getElementById('valorDesejado').value = data.valorDesejado;
+                    document.getElementById('percentual').value = data.percentual;
+                    document.getElementById('fiiPercentual').value = data.fiiPercentual;
+                    document.getElementById('acoesPercentual').value = data.acoesPercentual;
+                    document.getElementById('rendaFixaPercentual').value = data.rendaFixaPercentual;
+                    document.getElementById('internacionalPercentual').value = data.internacionalPercentual;
+                    document.getElementById('fiiDividendoPercentual').value = data.fiiDividendoPercentual;
+                    document.getElementById('acoesDividendoPercentual').value = data.acoesDividendoPercentual;
+                    document.getElementById('rendaFixaDividendoPercentual').value = data.rendaFixaDividendoPercentual;
+                    document.getElementById('internacionalDividendoPercentual').value = data.internacionalDividendoPercentual;
+                    document.getElementById('taxaRetorno').value = data.taxaRetorno;
+                    document.getElementById('anos').value = data.anos;
+                    
+                    // Trigger calculations after loading data
+                    calcularPatrimonio();
+                } else {
+                    console.log("Nenhum dado encontrado para este usuário.");
+                }
+            }, (error) => {
+                console.error("Erro ao ler dados: ", error);
+            });
+        };
+        
+        window.showMessage = (message, className) => {
+            const messageBox = document.createElement('div');
+            messageBox.textContent = message;
+            messageBox.className = `mt-4 p-4 rounded-lg text-center ${className}`;
+            const container = document.querySelector('.bg-white');
+            container.insertBefore(messageBox, container.lastChild);
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000);
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #d6eaff, #f0f4f9);
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full">
+        <!-- User ID display -->
+        <div class="text-xs text-right text-gray-400 mb-4">
+            ID do Usuário: <span id="userIdDisplay">Carregando...</span>
+        </div>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Calculadora de Patrimônio</h1>
+        <p class="text-center text-gray-600 mb-8">
+            Calcule seu patrimônio total com base no seu gasto mensal e na porcentagem que ele representa.
+        </p>
+        
+        <!-- Seção de Explicação da Regra dos 4% -->
+        <div class="mb-12 p-6 bg-gray-50 rounded-lg shadow-inner">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">A Regra dos 4%: Por Que Ela é Essencial?</h2>
+            <p class="text-gray-700 leading-relaxed mb-4">
+                A <strong>Regra dos 4%</strong> é um conceito fundamental no mundo da independência financeira. Ela sugere que, para um patrimônio que está sendo investido, a retirada anual de até 4% desse valor pode ser feita de forma sustentável, sem esgotar o capital ao longo do tempo.
+            </p>
+            <p class="text-gray-700 leading-relaxed mb-4">
+                A regra foi popularizada pelo <a href="#" class="text-indigo-600 hover:underline">Trinity Study</a>, um estudo que analisou o desempenho de portfólios de investimento ao longo de décadas. O estudo concluiu que, com uma alocação de ativos diversificada, uma taxa de retirada de 4% ao ano tinha uma alta probabilidade de sucesso (ou seja, o dinheiro não acabaria) por 30 anos ou mais.
+            </p>
+            <p class="text-gray-700 leading-relaxed">
+                A importância de manter os gastos abaixo desse limite é que os 6% restantes (assumindo um retorno médio de 10% do mercado, por exemplo) permitem que seu capital continue crescendo e se ajuste à inflação, garantindo que o seu "salário" proveniente dos investimentos se mantenha relevante e duradouro. Isso é o que permite a <strong class="text-indigo-600">verdadeira independência financeira</strong>, onde você vive da renda gerada pelo seu patrimônio, sem a necessidade de trabalhar.
+            </p>
+        </div>
+
+        <div class="space-y-6">
+            <div>
+                <label for="valorDesejado" class="block text-gray-700 font-semibold mb-2">Valor que desejo Ganhar mensalmente no futuro (R$)</label>
+                <input type="number" id="valorDesejado" placeholder="Ex: 5000" class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            </div>
+
+            <div>
+                <label for="percentual" class="block text-gray-700 font-semibold mb-2">Porcentagem do Patrimônio Total (%)</label>
+                <input type="number" id="percentual" placeholder="Ex: 0.5" class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            </div>
+
+            <button onclick="calcularPatrimonio()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition-colors">
+                Calcular Patrimônio
+            </button>
+        </div>
+
+        <div id="resultadoPatrimonio" class="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-200 hidden">
+            <h2 class="text-xl font-bold text-blue-800">Seu Patrimônio Total é:</h2>
+            <p id="valorPatrimonio" class="text-3xl font-extrabold text-blue-900 mt-2"></p>
+        </div>
+
+        <div id="mensagemErroPatrimonio" class="mt-8 p-4 bg-red-100 text-red-700 font-medium rounded-lg hidden">
+            Por favor, insira valores válidos para calcular o patrimônio.
+        </div>
+        
+        <hr class="my-8 border-t-2 border-gray-200">
+
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Planejamento da Carteira de Investimento</h2>
+        <p class="text-center text-gray-600 mb-8">
+            Distribua seu patrimônio entre as classes de ativos para alcançar seu objetivo.
+        </p>
+
+        <div class="space-y-6">
+            <div class="flex items-center space-x-4">
+                <label for="fiiPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">FII (%)</label>
+                <input type="number" id="fiiPercentual" value="20" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="fiiValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label for="acoesPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">Ações (%)</label>
+                <input type="number" id="acoesPercentual" value="60" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="acoesValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label for="rendaFixaPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">Renda Fixa (%)</label>
+                <input type="number" id="rendaFixaPercentual" value="5" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="rendaFixaValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label for="internacionalPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">Internacional (%)</label>
+                <input type="number" id="internacionalPercentual" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="internacionalValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+
+            <button onclick="calcularCarteira()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition-colors">
+                Calcular Carteira
+            </button>
+        </div>
+
+        <div id="mensagemErroCarteira" class="mt-8 p-4 bg-red-100 text-red-700 font-medium rounded-lg hidden">
+            A soma das porcentagens deve ser exatamente 100%. Por favor, ajuste os valores.
+        </div>
+        
+        <!-- Canvas para o gráfico de pizza -->
+        <div id="pieChartContainer" class="mt-8 hidden">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Alocação da Carteira</h2>
+            <canvas id="portfolioPieChart"></canvas>
+        </div>
+
+        <hr class="my-8 border-t-2 border-gray-200">
+
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Dividendos Projetados</h2>
+        <p class="text-center text-gray-600 mb-8">
+            Calcule os dividendos anuais e mensais com base no retorno projetado de cada classe de ativo.
+        </p>
+
+        <div class="space-y-6">
+            <div class="flex items-center space-x-4">
+                <label for="fiiDividendoPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">FII (%)</label>
+                <input type="number" id="fiiDividendoPercentual" value="12" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="fiiDividendoValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label for="acoesDividendoPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">Ações (%)</label>
+                <input type="number" id="acoesDividendoPercentual" value="9" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="acoesDividendoValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label for="rendaFixaDividendoPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">Renda Fixa (%)</label>
+                <input type="number" id="rendaFixaDividendoPercentual" value="13" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="rendaFixaDividendoValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label for="internacionalDividendoPercentual" class="block text-gray-700 font-semibold mb-2 w-1/3">Internacional (%)</label>
+                <input type="number" id="internacionalDividendoPercentual" value="14" class="w-2/3 px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right">
+                <span id="internacionalDividendoValor" class="text-lg font-bold text-gray-800 w-1/3 text-right"></span>
+            </div>
+        </div>
+
+        <div id="resultadoDividendos" class="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-200 hidden">
+            <h2 class="text-xl font-bold text-blue-800">Dividendos Projetados:</h2>
+            <ul class="list-disc list-inside mt-4 text-gray-700 space-y-2">
+                <li><span class="font-bold">Total Anual:</span> <span id="totalDividendoAnual" class="font-extrabold text-blue-900"></span></li>
+                <li><span class="font-bold">Total Mensal:</span> <span id="totalDividendoMensal" class="font-extrabold text-blue-900"></span></li>
+            </ul>
+        </div>
+
+        <hr class="my-8 border-t-2 border-gray-200">
+
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Cálculo de Investimento Mensal</h2>
+        <p class="text-center text-gray-600 mb-8">
+            Descubra quanto precisa investir mensalmente para alcançar o patrimônio desejado.
+        </p>
+        
+        <div class="space-y-6">
+            <div>
+                <label for="taxaRetorno" class="block text-gray-700 font-semibold mb-2">Taxa de Retorno Anual (%)</label>
+                <input type="number" id="taxaRetorno" placeholder="Ex: 6" class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            </div>
+            
+            <div>
+                <label for="anos" class="block text-gray-700 font-semibold mb-2">Tempo em Anos</label>
+                <input type="number" id="anos" placeholder="Ex: 30" class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            </div>
+
+            <button onclick="calcularInvestimentoMensal()" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-green-700 transition-colors">
+                Calcular Investimento
+            </button>
+        </div>
+
+        <div id="resultadoInvestimento" class="mt-8 p-6 bg-green-50 rounded-lg border border-green-200 hidden">
+            <h2 class="text-xl font-bold text-green-800">Você precisa investir:</h2>
+            <p id="valorInvestimento" class="text-3xl font-extrabold text-green-900 mt-2"></p>
+        </div>
+
+        <div id="mensagemErroInvestimento" class="mt-8 p-4 bg-red-100 text-red-700 font-medium rounded-lg hidden">
+            Por favor, insira valores válidos. A taxa de retorno e o tempo devem ser maiores que zero.
+        </div>
+
+        <!-- Canvas para o gráfico de investimento -->
+        <div id="chartContainer" class="mt-8 hidden">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Crescimento do Patrimônio</h2>
+            <canvas id="investmentChart"></canvas>
+        </div>
+        
+        <hr class="my-8 border-t-2 border-gray-200">
+
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Análise de Inflação e Crescimento Real</h2>
+        <p class="text-center text-gray-600 mb-8">
+            Verifique se seu patrimônio está crescendo acima da inflação.
+        </p>
+
+        <div class="space-y-6">
+            <div>
+                <label for="inflacaoAnual" class="block text-gray-700 font-semibold mb-2">Inflação Anual (%)</label>
+                <input type="number" id="inflacaoAnual" value="6" class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            </div>
+            <button onclick="analisarInflacao()" class="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-yellow-600 transition-colors">
+                Analisar Inflação
+            </button>
+        </div>
+
+        <div id="resultadoInflacao" class="mt-8 p-6 bg-yellow-50 rounded-lg border border-yellow-200 hidden">
+            <h2 class="text-xl font-bold text-yellow-800">Análise de Crescimento:</h2>
+            <ul class="list-disc list-inside mt-4 text-gray-700 space-y-2">
+                <li><span class="font-bold">Retorno Real da Carteira:</span> <span id="retornoReal" class="font-extrabold text-yellow-900"></span><p class="text-sm mt-1 text-gray-600" id="retornoRealExplicacao"></p></li>
+                <li><span class="font-bold">Aporte Necessário para FIIs (próximo ano):</span> <span id="aporteFiiInflacao" class="font-extrabold text-yellow-900"></span><p class="text-sm mt-1 text-gray-600" id="aporteFiiExplicacao"></p></li>
+            </ul>
+        </div>
+        
+        <hr class="my-8 border-t-2 border-gray-200">
+
+        <!-- Report section -->
+        <div id="relatorioCompleto" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 hidden">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Relatório de Análise</h2>
+            <div class="space-y-4">
+                <p><span class="font-semibold text-gray-700">Objetivo de Renda Mensal:</span> <span id="reportValorDesejado" class="font-bold text-gray-900"></span></p>
+                <p><span class="font-semibold text-gray-700">Patrimônio Total Necessário:</span> <span id="reportPatrimonioTotal" class="font-bold text-gray-900"></span></p>
+                <h3 class="font-semibold text-gray-700 text-lg mt-4">Alocação de Patrimônio:</h3>
+                <ul class="list-disc list-inside text-gray-700">
+                    <li>FII: <span id="reportFiiValor" class="font-bold text-gray-900"></span></li>
+                    <li>Ações: <span id="reportAcoesValor" class="font-bold text-gray-900"></span></li>
+                    <li>Renda Fixa: <span id="reportRendaFixaValor" class="font-bold text-gray-900"></span></li>
+                    <li>Internacional: <span id="reportInternacionalValor" class="font-bold text-gray-900"></span></li>
+                </ul>
+                <h3 class="font-semibold text-gray-700 text-lg mt-4">Dividendos Projetados Anuais:</h3>
+                <ul class="list-disc list-inside text-gray-700">
+                    <li>Total Anual: <span id="reportTotalDividendoAnual" class="font-bold text-gray-900"></span></li>
+                    <li>Total Mensal: <span id="reportTotalDividendoMensal" class="font-bold text-gray-900"></span></li>
+                </ul>
+                <h3 class="font-semibold text-gray-700 text-lg mt-4">Análise de Crescimento Real:</h3>
+                <ul class="list-disc list-inside text-gray-700">
+                    <li>Retorno Real: <span id="reportRetornoReal" class="font-bold text-gray-900"></span></li>
+                    <li>Aporte em FIIs para Inflação: <span id="reportAporteFiiInflacao" class="font-bold text-gray-900"></span></li>
+                </ul>
+                <p class="mt-4"><span class="font-semibold text-gray-700">Para atingir o objetivo, você precisa investir mensalmente:</span> <span id="reportInvestimentoMensal" class="font-bold text-green-700"></span></p>
+                
+                <!-- Nova seção de análise de viabilidade -->
+                <h3 class="font-semibold text-gray-700 text-lg mt-4">Análise de Viabilidade: FIIs</h3>
+                <p id="analiseViabilidadeFII" class="text-gray-700"></p>
+            </div>
+        </div>
+
+        <div class="mt-8 flex justify-center space-x-4">
+            <button onclick="saveData()" class="bg-blue-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg hover:bg-blue-600 transition-colors">
+                Salvar Dados
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        let myChart = null;
+        let myPieChart = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add input listeners for real-time updates
+            document.getElementById('valorDesejado').addEventListener('input', calcularPatrimonio);
+            document.getElementById('percentual').addEventListener('input', calcularPatrimonio);
+            document.getElementById('fiiPercentual').addEventListener('input', calcularCarteira);
+            document.getElementById('acoesPercentual').addEventListener('input', calcularCarteira);
+            document.getElementById('rendaFixaPercentual').addEventListener('input', calcularCarteira);
+            document.getElementById('internacionalPercentual').addEventListener('input', calcularCarteira);
+            document.getElementById('fiiDividendoPercentual').addEventListener('input', calcularDividendos);
+            document.getElementById('acoesDividendoPercentual').addEventListener('input', calcularDividendos);
+            document.getElementById('rendaFixaDividendoPercentual').addEventListener('input', calcularDividendos);
+            document.getElementById('internacionalDividendoPercentual').addEventListener('input', calcularDividendos);
+            document.getElementById('taxaRetorno').addEventListener('input', calcularInvestimentoMensal);
+            document.getElementById('anos').addEventListener('input', calcularInvestimentoMensal);
+        });
+
+        function calcularPatrimonio() {
+            const valorDesejadoInput = document.getElementById('valorDesejado');
+            const percentualInput = document.getElementById('percentual');
+            const resultadoDiv = document.getElementById('resultadoPatrimonio');
+            const valorPatrimonioSpan = document.getElementById('valorPatrimonio');
+            const mensagemErroDiv = document.getElementById('mensagemErroPatrimonio');
+            const relatorioCompletoDiv = document.getElementById('relatorioCompleto');
+
+            const valorDesejado = parseFloat(valorDesejadoInput.value);
+            const percentual = parseFloat(percentualInput.value);
+
+            resultadoDiv.classList.add('hidden');
+            mensagemErroDiv.classList.add('hidden');
+            relatorioCompletoDiv.classList.add('hidden');
+
+            if (isNaN(valorDesejado) || isNaN(percentual) || percentual <= 0) {
+                mensagemErroDiv.classList.remove('hidden');
+                return;
+            }
+
+            const patrimonioTotal = (valorDesejado * 12) / (percentual / 100);
+            sessionStorage.setItem('patrimonioTotal', patrimonioTotal);
+            sessionStorage.setItem('valorDesejado', valorDesejado);
+
+            const formatter = new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+            });
+
+            valorPatrimonioSpan.textContent = formatter.format(patrimonioTotal);
+            resultadoDiv.classList.remove('hidden');
+
+            calcularCarteira();
+        }
+
+        function calcularInvestimentoMensal() {
+            const taxaRetornoInput = document.getElementById('taxaRetorno');
+            const anosInput = document.getElementById('anos');
+            const resultadoDiv = document.getElementById('resultadoInvestimento');
+            const valorInvestimentoSpan = document.getElementById('valorInvestimento');
+            const mensagemErroDiv = document.getElementById('mensagemErroInvestimento');
+            const chartContainer = document.getElementById('chartContainer');
+            const relatorioCompletoDiv = document.getElementById('relatorioCompleto');
+
+            const taxaRetorno = parseFloat(taxaRetornoInput.value);
+            const anos = parseFloat(anosInput.value);
+            const patrimonioTotal = parseFloat(sessionStorage.getItem('patrimonioTotal'));
+
+            resultadoDiv.classList.add('hidden');
+            mensagemErroDiv.classList.add('hidden');
+            chartContainer.classList.add('hidden');
+
+            if (isNaN(patrimonioTotal) || isNaN(taxaRetorno) || isNaN(anos) || taxaRetorno <= 0 || anos <= 0) {
+                mensagemErroDiv.classList.remove('hidden');
+                return;
+            }
+
+            const taxaMensal = (taxaRetorno / 100) / 12;
+            const periodos = anos * 12;
+
+            if (taxaMensal <= 0) {
+                mensagemErroDiv.classList.remove('hidden');
+                return;
+            }
+
+            const investimentoMensal = patrimonioTotal / (((Math.pow(1 + taxaMensal, periodos) - 1) / taxaMensal));
+
+            const formatter = new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+            });
+
+            valorInvestimentoSpan.textContent = formatter.format(investimentoMensal);
+            resultadoDiv.classList.remove('hidden');
+
+            document.getElementById('reportInvestimentoMensal').textContent = formatter.format(investimentoMensal);
+
+            const labels = [];
+            const data = [];
+            for (let i = 1; i <= anos; i++) {
+                labels.push(`Ano ${i}`);
+                const valorAnual = investimentoMensal * (((Math.pow(1 + taxaMensal, i * 12) - 1) / taxaMensal) * (1 + taxaMensal));
+                data.push(valorAnual);
+            }
+
+            renderLineChart(labels, data);
+            relatorioCompletoDiv.classList.remove('hidden');
+            analisarInflacao();
+        }
+
+        function renderLineChart(labels, data) {
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const ctx = document.getElementById('investmentChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Crescimento do Patrimônio',
+                        data: data,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgb(59, 130, 246)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Patrimônio (R$)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 });
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Anos'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.raw);
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('chartContainer').classList.remove('hidden');
+        }
+
+        function renderPieChart(labels, data) {
+            if (myPieChart) {
+                myPieChart.destroy();
+            }
+
+            const ctx = document.getElementById('portfolioPieChart').getContext('2d');
+            const colors = ['#22c55e', '#ef4444', '#f59e0b', '#3b82f6'];
+
+            myPieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    return `${label}: ${value}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('pieChartContainer').classList.remove('hidden');
+        }
+
+        function calcularCarteira() {
+            const fiiInput = document.getElementById('fiiPercentual');
+            const acoesInput = document.getElementById('acoesPercentual');
+            const rendaFixaInput = document.getElementById('rendaFixaPercentual');
+            const internacionalInput = document.getElementById('internacionalPercentual');
+            const mensagemErroDiv = document.getElementById('mensagemErroCarteira');
+            const valorFiiSpan = document.getElementById('fiiValor');
+            const valorAcoesSpan = document.getElementById('acoesValor');
+            const valorRendaFixaSpan = document.getElementById('rendaFixaValor');
+            const valorInternacionalSpan = document.getElementById('internacionalValor');
+            
+            const patrimonioTotal = parseFloat(sessionStorage.getItem('patrimonioTotal'));
+
+            if (isNaN(patrimonioTotal)) {
+                return;
+            }
+
+            const fiiPercentual = parseFloat(fiiInput.value);
+            const acoesPercentual = parseFloat(acoesInput.value);
+            const rendaFixaPercentual = parseFloat(rendaFixaInput.value);
+            
+            mensagemErroDiv.classList.add('hidden');
+            
+            if (isNaN(fiiPercentual) || isNaN(acoesPercentual) || isNaN(rendaFixaPercentual)) {
+                mensagemErroDiv.textContent = "Por favor, insira valores válidos para todas as classes de ativo.";
+                mensagemErroDiv.classList.remove('hidden');
+                return;
+            }
+
+            // Calcula o percentual Internacional para complementar a 100%
+            const internacionalPercentual = 100 - (fiiPercentual + acoesPercentual + rendaFixaPercentual);
+            internacionalInput.value = internacionalPercentual.toFixed(2);
+
+            const valorFii = (patrimonioTotal * fiiPercentual) / 100;
+            const valorAcoes = (patrimonioTotal * acoesPercentual) / 100;
+            const valorRendaFixa = (patrimonioTotal * rendaFixaPercentual) / 100;
+            const valorInternacional = (patrimonioTotal * internacionalPercentual) / 100;
+            
+            sessionStorage.setItem('valorFii', valorFii);
+
+            const formatter = new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+            });
+
+            valorFiiSpan.textContent = `(${formatter.format(valorFii)})`;
+            valorAcoesSpan.textContent = `(${formatter.format(valorAcoes)})`;
+            valorRendaFixaSpan.textContent = `(${formatter.format(valorRendaFixa)})`;
+            valorInternacionalSpan.textContent = `(${formatter.format(valorInternacional)})`;
+
+            // Update report
+            document.getElementById('reportFiiValor').textContent = formatter.format(valorFii);
+            document.getElementById('reportAcoesValor').textContent = formatter.format(valorAcoes);
+            document.getElementById('reportRendaFixaValor').textContent = formatter.format(valorRendaFixa);
+            document.getElementById('reportInternacionalValor').textContent = formatter.format(valorInternacional);
+
+            // Render the pie chart
+            const labels = ['FII', 'Ações', 'Renda Fixa', 'Internacional'];
+            const data = [fiiPercentual, acoesPercentual, rendaFixaPercentual, internacionalPercentual];
+            renderPieChart(labels, data);
+            
+            calcularDividendos();
+        }
+
+        function calcularDividendos() {
+            const patrimonioTotal = parseFloat(sessionStorage.getItem('patrimonioTotal'));
+            const fiiPercentual = parseFloat(document.getElementById('fiiPercentual').value);
+            const acoesPercentual = parseFloat(document.getElementById('acoesPercentual').value);
+            const rendaFixaPercentual = parseFloat(document.getElementById('rendaFixaPercentual').value);
+            const internacionalPercentual = parseFloat(document.getElementById('internacionalPercentual').value);
+
+            if (isNaN(fiiPercentual) || isNaN(acoesPercentual) || isNaN(rendaFixaPercentual) || isNaN(internacionalPercentual)) {
+                return;
+            }
+
+            const valorFii = (patrimonioTotal * fiiPercentual) / 100;
+            const valorAcoes = (patrimonioTotal * acoesPercentual) / 100;
+            const valorRendaFixa = (patrimonioTotal * rendaFixaPercentual) / 100;
+            const valorInternacional = (patrimonioTotal * internacionalPercentual) / 100;
+
+            const fiiDividendoPercentual = parseFloat(document.getElementById('fiiDividendoPercentual').value);
+            const acoesDividendoPercentual = parseFloat(document.getElementById('acoesDividendoPercentual').value);
+            const rendaFixaDividendoPercentual = parseFloat(document.getElementById('rendaFixaDividendoPercentual').value);
+            const internacionalDividendoPercentual = parseFloat(document.getElementById('internacionalDividendoPercentual').value);
+            
+            const resultadoDividendosDiv = document.getElementById('resultadoDividendos');
+            const fiiDividendoValorSpan = document.getElementById('fiiDividendoValor');
+            const acoesDividendoValorSpan = document.getElementById('acoesDividendoValor');
+            const rendaFixaDividendoValorSpan = document.getElementById('rendaFixaDividendoValor');
+            const internacionalDividendoValorSpan = document.getElementById('internacionalDividendoValor');
+            const totalDividendoAnualSpan = document.getElementById('totalDividendoAnual');
+            const totalDividendoMensalSpan = document.getElementById('totalDividendoMensal');
+            const analiseViabilidadeFIIDiv = document.getElementById('analiseViabilidadeFII');
+            const taxaRetornoInput = document.getElementById('taxaRetorno');
+
+
+            if (isNaN(patrimonioTotal) || isNaN(fiiDividendoPercentual) || isNaN(acoesDividendoPercentual) || isNaN(rendaFixaDividendoPercentual) || isNaN(internacionalDividendoPercentual)) {
+                return;
+            }
+
+            const fiiDividendoAnual = (valorFii * fiiDividendoPercentual) / 100;
+            const acoesDividendoAnual = (valorAcoes * acoesDividendoPercentual) / 100;
+            const rendaFixaDividendoAnual = (valorRendaFixa * rendaFixaDividendoPercentual) / 100;
+            const internacionalDividendoAnual = (valorInternacional * internacionalDividendoPercentual) / 100;
+
+            const totalDividendoAnual = fiiDividendoAnual + acoesDividendoAnual + rendaFixaDividendoAnual + internacionalDividendoAnual;
+            const totalDividendoMensal = totalDividendoAnual / 12;
+
+            const totalDividendoAnualPercentual = (totalDividendoAnual / patrimonioTotal) * 100;
+            const totalDividendoMensalPercentual = totalDividendoAnualPercentual / 12;
+
+            const formatter = new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+            });
+
+            fiiDividendoValorSpan.textContent = `(${formatter.format(fiiDividendoAnual)})`;
+            acoesDividendoValorSpan.textContent = `(${formatter.format(acoesDividendoAnual)})`;
+            rendaFixaDividendoValorSpan.textContent = `(${formatter.format(rendaFixaDividendoAnual)})`;
+            internacionalDividendoValorSpan.textContent = `(${formatter.format(internacionalDividendoAnual)})`;
+            totalDividendoAnualSpan.textContent = `${formatter.format(totalDividendoAnual)} (${totalDividendoAnualPercentual.toFixed(2)}% ao ano)`;
+            totalDividendoMensalSpan.textContent = `${formatter.format(totalDividendoMensal)} (${totalDividendoMensalPercentual.toFixed(2)}% ao mês)`;
+
+            resultadoDividendosDiv.classList.remove('hidden');
+            
+            // Sugere a taxa de retorno anual com o valor calculado dos dividendos anuais
+            taxaRetornoInput.value = totalDividendoAnualPercentual.toFixed(2);
+            sessionStorage.setItem('totalDividendoAnualPercentual', totalDividendoAnualPercentual);
+
+
+            // Update report
+            document.getElementById('reportValorDesejado').textContent = formatter.format(parseFloat(sessionStorage.getItem('valorDesejado')));
+            document.getElementById('reportPatrimonioTotal').textContent = formatter.format(patrimonioTotal);
+            document.getElementById('reportTotalDividendoAnual').textContent = `${formatter.format(totalDividendoAnual)} (${totalDividendoAnualPercentual.toFixed(2)}% ao ano)`;
+            document.getElementById('reportTotalDividendoMensal').textContent = `${formatter.format(totalDividendoMensal)} (${totalDividendoMensalPercentual.toFixed(2)}% ao mês)`;
+
+            // Análise de Viabilidade dos FIIs
+            const valorDesejado = parseFloat(sessionStorage.getItem('valorDesejado'));
+            const fiiDividendoMensal = fiiDividendoAnual / 12;
+            
+            let analiseTexto = '';
+            if (fiiDividendoMensal >= valorDesejado) {
+                analiseTexto = `<span class="text-green-700 font-bold">Viável.</span> Os dividendos mensais dos FIIs (${formatter.format(fiiDividendoMensal)}) são suficientes para cobrir seu objetivo de renda mensal (${formatter.format(valorDesejado)}).`;
+            } else {
+                analiseTexto = `<span class="text-red-700 font-bold">Não viável.</span> Os dividendos mensais dos FIIs (${formatter.format(fiiDividendoMensal)}) não são suficientes para cobrir seu objetivo de renda mensal (${formatter.format(valorDesejado)}). Você precisará de dividendos de outras classes de ativos para atingir o objetivo.`;
+            }
+            analiseViabilidadeFIIDiv.innerHTML = analiseTexto;
+        }
+        
+        function analisarInflacao() {
+            const taxaRetorno = parseFloat(sessionStorage.getItem('totalDividendoAnualPercentual'));
+            const inflacaoAnual = parseFloat(document.getElementById('inflacaoAnual').value);
+            const patrimonioTotal = parseFloat(sessionStorage.getItem('patrimonioTotal'));
+            const valorFii = parseFloat(sessionStorage.getItem('valorFii'));
+
+            const resultadoDiv = document.getElementById('resultadoInflacao');
+            const retornoRealSpan = document.getElementById('retornoReal');
+            const retornoRealExplicacaoP = document.getElementById('retornoRealExplicacao');
+            const aporteFiiInflacaoSpan = document.getElementById('aporteFiiInflacao');
+            const aporteFiiExplicacaoP = document.getElementById('aporteFiiExplicacao');
+
+
+            if (isNaN(taxaRetorno) || isNaN(inflacaoAnual) || isNaN(patrimonioTotal) || isNaN(valorFii)) {
+                resultadoDiv.classList.add('hidden');
+                return;
+            }
+
+            // Calcula o retorno real
+            const retornoRealDecimal = ((1 + taxaRetorno / 100) / (1 + inflacaoAnual / 100)) - 1;
+            const retornoRealPercentual = retornoRealDecimal * 100;
+
+            // Calcula o aporte necessário em FIIs para manter o poder de compra
+            const aporteFiiInflacao = valorFii * (inflacaoAnual / 100);
+
+            const formatter = new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+            });
+
+            retornoRealSpan.textContent = `${retornoRealPercentual.toFixed(2)}%`;
+            if (retornoRealPercentual > 0) {
+                retornoRealSpan.classList.remove('text-red-900');
+                retornoRealSpan.classList.add('text-green-900');
+                retornoRealExplicacaoP.textContent = `Seu patrimônio está crescendo acima da inflação, ou seja, seu poder de compra está aumentando.`;
+            } else {
+                retornoRealSpan.classList.remove('text-green-900');
+                retornoRealSpan.classList.add('text-red-900');
+                retornoRealExplicacaoP.textContent = `Seu patrimônio não está acompanhando a inflação, ou seja, seu poder de compra está diminuindo.`;
+            }
+            
+            // Aporte para FIIs
+            const dividendoMensalFiiAtual = (valorFii * parseFloat(document.getElementById('fiiDividendoPercentual').value) / 100) / 12;
+            const novoDividendoMensal = dividendoMensalFiiAtual * (1 + (inflacaoAnual / 100));
+
+            aporteFiiInflacaoSpan.textContent = `${formatter.format(aporteFiiInflacao)} (${formatter.format(novoDividendoMensal)} mensais)`;
+            aporteFiiExplicacaoP.textContent = `Esse é o valor de aporte em FIIs necessário para manter o poder de compra no próximo ano. O novo recebimento mensal de dividendos para essa porção da carteira seria de ${formatter.format(novoDividendoMensal)}.`;
+
+            resultadoDiv.classList.remove('hidden');
+
+            // Update report
+            document.getElementById('reportRetornoReal').textContent = `${retornoRealPercentual.toFixed(2)}%`;
+            document.getElementById('reportAporteFiiInflacao').textContent = formatter.format(aporteFiiInflacao);
+        }
+
+    </script>
+</body>
+</html>
