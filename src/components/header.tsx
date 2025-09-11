@@ -1,8 +1,7 @@
 import logo from "../../imgs/calculator.png"
-import React from "react"
 import "../style/header.css"
 
-const Header: React.FC = () => {
+function Header(){
   return (
     <header className="header">
       <img src={logo} alt="Calculator Logo" className="logo"/>
