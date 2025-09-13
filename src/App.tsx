@@ -2,6 +2,7 @@ import './style/App.css'
 import Header from './components/header'
 import Card from './components/textcard'
 import PTCard from './components/patr_total_card'
+import DCCard from './components/div_cart_card'
 
 const card_4_rule_title: string = "A Regra dos 4%"
 const card_4_rule_descr: string = `
@@ -19,6 +20,8 @@ function App() {
       <Card title={card_4_rule_title} description={card_4_rule_descr}/>
       <br/><br/>
       <PTCard/>
+      <br/><br/>
+      <DCCard/>
     </div>
   )
 }
