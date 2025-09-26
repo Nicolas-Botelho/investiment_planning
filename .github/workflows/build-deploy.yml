@@ -19,8 +19,9 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
-        run: npm install netlify-cli --save-dev
+        run: |
+          npm install
+          npm install netlify-cli --save-dev
 
       - name: Build project
         run: npm run build
