@@ -1,0 +1,24 @@
+:root {
+  --text: #242424;
+
+  --main-1: #FAFAE1;
+  --main-2: #CFCF98;
+  --main-3: #A5A55D;
+  --main-4: #7A7A31;
+  --main-5: #505013;
+  --main-6: #333303;
+
+  --second-1: #E1EFFA;
+  --second-2: #98B7CF;
+  --second-3: #5D86A5;
+  --second-4: #315B7A;
+  --second-5: #133550;
+  --second-6: #031E33;
+
+  --third-1: #FAE1E1;
+  --third-2: #CF9898;
+  --third-3: #A55D5D;
+  --third-4: #7A3131;
+  --third-5: #501313;
+  --third-6: #330303;
+}
