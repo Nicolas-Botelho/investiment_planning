@@ -5,6 +5,8 @@ import { GlobalContext } from "./context";
 export function CRCard() {
   const context = useContext(GlobalContext)
 
+  console.log(context.total)
+
   return (
     <div className="card">
       <h2>Analise de Inflação e Crescimento Real</h2>

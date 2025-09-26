@@ -5,6 +5,8 @@ import { GlobalContext } from "./context";
 export function RACard() {
   const context = useContext(GlobalContext)
 
+  console.log(context.total)
+
   return (
     <div className="card">
       <h2>Relatório para Análise</h2>
