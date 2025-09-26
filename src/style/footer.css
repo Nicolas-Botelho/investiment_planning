@@ -1,0 +1,25 @@
+.footer {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text);
+}
+
+.link {
+  color: var(--text);
+}
+
+.link:link {
+  color: var(--second-4);
+}
+
+.link:visited {
+  color: var(--third-4);
+}
+
+.link:hover {
+  color: var(--second-3);
+}
+
+.link:active {
+  color: var(--second-3)
+}

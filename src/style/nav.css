@@ -1,0 +1,35 @@
+@import './colors.css';
+
+.navbar {
+  list-style-type: none;
+  border-style: solid;
+  border-radius: 1rem;
+  border-width: 0.15rem;
+  border-color: var(--third-6);
+  background-color: var(--third-1);
+  padding: 1rem;
+}
+
+.item {
+  color: var(--text);
+}
+
+.link {
+  color: var(--text);
+}
+
+.link:link {
+  color: var(--second-4);
+}
+
+.link:visited {
+  color: var(--third-4);
+}
+
+.link:hover {
+  color: var(--second-3);
+}
+
+.link:active {
+  color: var(--second-3);
+}
