@@ -31,6 +31,10 @@ function App() {
     porcentagem_fii: Number(localStorage.getItem("porcentagem_fii")) ?? 30,
     porcentagem_fixa: Number(localStorage.getItem("porcentagem_fixa")) ?? 30,
     porcentagem_ext: Number(localStorage.getItem("porcentagem_ext")) ?? 10,
+    dividendo_acao: Number(localStorage.getItem("dividendo_acao")) ?? 9,
+    dividendo_fii: Number(localStorage.getItem("dividendo_fii")) ?? 12,
+    dividendo_fixa: Number(localStorage.getItem("dividendo_fixa")) ?? 12,
+    dividendo_ext: Number(localStorage.getItem("dividendo_ext")) ?? 14,
   });
 
   localStorage.setItem("valor_mensal", JSON.stringify(context.valor_mensal))
@@ -40,6 +44,10 @@ function App() {
   localStorage.setItem("porcentagem_fii", JSON.stringify(context.porcentagem_fii))
   localStorage.setItem("porcentagem_fixa", JSON.stringify(context.porcentagem_fixa))
   localStorage.setItem("porcentagem_ext", JSON.stringify(context.porcentagem_ext))
+  localStorage.setItem("dividendo_acao", JSON.stringify(context.dividendo_acao))
+  localStorage.setItem("dividendo_fii", JSON.stringify(context.dividendo_fii))
+  localStorage.setItem("dividendo_fixa", JSON.stringify(context.dividendo_fixa))
+  localStorage.setItem("dividendo_ext", JSON.stringify(context.dividendo_ext))
 
   return (
     <GlobalContext.Provider value={context}>

@@ -8,6 +8,10 @@ type contextType = {
   porcentagem_fii: Number,
   porcentagem_fixa: Number,
   porcentagem_ext: Number,
+  dividendo_acao: Number,
+  dividendo_fii: Number,
+  dividendo_fixa: Number,
+  dividendo_ext: Number,
 }
 
 const contextObject: contextType = {
@@ -18,6 +22,10 @@ const contextObject: contextType = {
   porcentagem_fii: 0,
   porcentagem_fixa: 0,
   porcentagem_ext: 0,
+  dividendo_acao: 0,
+  dividendo_fii: 0,
+  dividendo_fixa: 0,
+  dividendo_ext: 0,
 }
 
 export const GlobalContext = createContext(contextObject);
